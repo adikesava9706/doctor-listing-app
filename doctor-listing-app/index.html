@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Doctor Listing - Find the Best Doctors</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Tailwind CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/css/all.min.css"/>
+  <!-- Google Fonts -->
+  <link href="https://cdn.jsdelivr.net/npm/@fontsource/roboto@3.3.1/400.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      background: #fafbfc;
+      color: #1a202c;
+    }
+    .fade-in {
+      animation: fadeIn .8s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px);}
+      to   { opacity: 1; transform: none;}
+    }
+    .scale-in {
+      animation: scaleIn .6s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.94);}
+      to   { opacity: 1; transform: none;}
+    }
+    .search-suggestions {
+      z-index: 20;
+    }
+    /* Make checkboxes & radios bigger for printable/PDF view */
+    input[type="checkbox"], input[type="radio"] {
+      width: 1.25em;
+      height: 1.25em;
+      vertical-align: middle;
+      margin-right: 0.6em;
+    }
+    /* Prevent scrollbars in filter container for PDF, show all */
+    @media print {
+      .overflow-auto {
+        overflow: visible !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="w-full max-w-7xl mx-auto py-8 px-4">
+    <!-- Header -->
+    <section class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+      <div class="flex flex-col mb-5 md:mb-0">
+        <h1 class="text-3xl md:text-4xl font-bold text-blue-800 mb-2 fade-in">Find Your Doctor</h1>
+        <p class="text-gray-600 text-lg">
+          Discover the best doctors near you. Filter by specialty, consultation type, experience & more, with beautiful, interactive animations.
+        </p>
+      </div>
+      <div class="flex items-center justify-center">
+        <div class="relative">
+          <input id="autocomplete-input"
+            data-testid="autocomplete-input"
+            type="text"
+            autocomplete="off"
+            class="w-64 py-2 pl-10 pr-4 border border-gray-300 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+            placeholder="Search by doctor's name..."
+            oninput="handleAutocomplete(this.value)"
+            onfocus="handleAutocomplete(this.value)"
+            />
+          <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-blue-400 pointer-events-none">
+            <i class="fas fa-search"></i>
+          </span>
+          <ul id="search-suggestions"
+              class="search-suggestions absolute top-11 left-0 w-64 bg-white border border-gray-200 rounded-lg mt-1 shadow-lg hidden"
+              >
+            <!-- Suggestions will be rendered here -->
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filters and Doctor List -->
+    <div class="flex flex-col md:flex-row md:space-x-10">
+      <!-- Filter Panel -->
+      <aside class="w-full md:w-1/4 mb-8 md:mb-0">
+        <div class="bg-white rounded-xl shadow p-5 scale-in">
+          <!-- Consultation Type Filter -->
+          <h2 class="text-lg font-semibold mb-2" data-testid="filter-header-moc">
+            <i class="fas fa-video text-blue-500 mr-2"></i>Consultation Type
+          </h2>
+          <div class="mb-4 flex flex-col space-y-1">
+            <label class="flex items-center cursor-pointer">
+              <input data-testid="filter-video-consult" type="radio" name="consultation-type" value="video_consult" onchange="applyFilters()" />
+              Video Consult
+            </label>
+            <label class="flex items-center cursor-pointer">
+              <input data-testid="filter-in-clinic" type="radio" name="consultation-type" value="in_clinic" onchange="applyFilters()" />
+              In Clinic
+            </label>
+            <label class="flex items-center cursor-pointer">
+              <input type="radio" name="consultation-type" value="" onchange="applyFilters()" />
+              <span class="text-gray-500">Any</span>
+            </label>
+          </div>
+          <!-- Specialties Filter -->
+          <h2 class="text-lg font-semibold mb-2 mt-6" data-testid="filter-header-speciality">
+            <i class="fas fa-stethoscope text-green-500 mr-2"></i>Specialties
+          </h2>
+          <div id="specialties-filter" class="flex flex-col space-y-1 max-h-96 overflow-auto">
+            <!-- Specialty checkboxes will be rendered here -->
+          </div>
+          <!-- Sorting -->
+          <h2 class="text-lg font-semibold mb-2 mt-6" data-testid="filter-header-sort">
+            <i class="fas fa-sort text-yellow-500 mr-2"></i>Sort
+          </h2>
+          <div class="flex flex-col space-y-1">
+            <label class="flex items-center cursor-pointer">
+              <input data-testid="sort-fees" type="radio" name="sort" value="fees" onchange="applyFilters()" />
+              Fees (Low to High)
+            </label>
+            <label class="flex items-center cursor-pointer">
+              <input data-testid="sort-experience" type="radio" name="sort" value="experience" onchange="applyFilters()" />
+              Experience (High to Low)
+            </label>
+            <label class="flex items-center cursor-pointer">
+              <input type="radio" name="sort" value="" onchange="applyFilters()" />
+              <span class="text-gray-500">None</span>
+            </label>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Doctor List -->
+      <section class="w-full md:w-3/4">
+        <div id="doctor-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 fade-in">
+          <!-- Doctor cards will be rendered here -->
+        </div>
+        <div id="no-results" class="text-center text-gray-500 text-xl mt-12 hidden">
+          <i class="fas fa-user-md text-4xl mb-2 text-blue-400 animate-bounce"></i><br>
+          No doctors found matching your criteria.
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    // Specialty List (matches data-testid spec)
+    const SPECIALTIES = [
+      "General Physician", "Dentist", "Dermatologist", "Paediatrician", "Gynaecologist", "ENT", "Diabetologist", "Cardiologist",
+      "Physiotherapist", "Endocrinologist", "Orthopaedic", "Ophthalmologist", "Gastroenterologist", "Pulmonologist", "Psychiatrist",
+      "Urologist", "Dietitian/Nutritionist", "Psychologist", "Sexologist", "Nephrologist", "Neurologist", "Oncologist", "Ayurveda", "Homeopath"
+    ];
+
+    // Store doctor data
+    let allDoctors = [];
+    let filteredDoctors = [];
+    let doctorNames = [];
+    let apiLoaded = false;
+
+    // Query Params Management
+    function updateQueryParams(params) {
+      const url = new URL(window.location);
+      Object.keys(params).forEach(key => {
+        if(params[key] && params[key] !== "") url.searchParams.set(key, params[key]);
+        else url.searchParams.delete(key);
+      });
+      window.history.pushState({}, '', url);
+    }
+    function loadStateFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      let state = {};
+      state.q = params.get('q') || '';
+      state.ct = params.get('ct') || '';
+      state.sp = params.get('sp') ? params.get('sp').split(',').filter(Boolean) : [];
+      state.sort = params.get('sort') || '';
+      return state;
+    }
+
+    // Render specialties checkboxes
+    function renderSpecialties(selectedSpecialties) {
+      let container = document.getElementById('specialties-filter');
+      container.innerHTML = '';
+      SPECIALTIES.forEach(spec => {
+        let specKey = spec.replace(/[ /]/g, '-');
+        const testid = `filter-specialty-${specKey}`;
+        let checked = selectedSpecialties && selectedSpecialties.includes(spec) ? 'checked' : '';
+        let id = `specialty-${specKey}`;
+        container.innerHTML += `
+          <label class="flex items-center cursor-pointer">
+            <input data-testid="${testid}" type="checkbox" id="${id}" value="${spec}" ${checked} onchange="applyFilters()" />
+            ${spec}
+          </label>`;
+      });
+    }
+
+    // Search params => filter panel sync (used on page load and navigation)
+    function syncFilterPanelWithState(state) {
+      // Autocomplete
+      document.getElementById('autocomplete-input').value = state.q || '';
+      // Consultation type
+      let found = false;
+      document.querySelectorAll('input[name="consultation-type"]').forEach(radio => {
+        if(radio.value === state.ct) {radio.checked=true; found=true;}
+        else {radio.checked=false;}
+      });
+      if(!found) document.querySelector('input[name="consultation-type"][value=""]').checked = true;
+      // Specialties
+      renderSpecialties(state.sp || []);
+      // Sort
+      found = false;
+      document.querySelectorAll('input[name="sort"]').forEach(radio => {
+        if(radio.value === state.sort) { radio.checked = true; found=true;}
+        else { radio.checked = false; }
+      });
+      if(!found) document.querySelector('input[name="sort"][value=""]').checked = true;
+    }
+
+    // Get filters from UI
+    function getCurrentFiltersFromPanel() {
+      const q = document.getElementById('autocomplete-input').value.trim();
+      let ct = '';
+      document.querySelectorAll('input[name="consultation-type"]').forEach(radio => {if(radio.checked) ct=radio.value;});
+      const sp = Array.from(document.querySelectorAll('#specialties-filter input[type="checkbox"]:checked')).map(cb => cb.value);
+      let sort = '';
+      document.querySelectorAll('input[name="sort"]').forEach(radio => {if(radio.checked) sort=radio.value;});
+      return { q, ct, sp, sort };
+    }
+
+    // Event handler for filters
+    function applyFilters(pushQuery=true) {
+      const {q, ct, sp, sort} = getCurrentFiltersFromPanel();
+      if(pushQuery) updateQueryParams({
+        q:q ? q : "",
+        ct:ct ? ct: "",
+        sp:(sp && sp.length > 0 ? sp.join(',') : ""),
+        sort:sort ? sort: ""
+      });
+      filterAndRenderDoctors({q, ct, sp, sort});
+    }
+
+    // Filtering, Searching, Sorting
+    function filterAndRenderDoctors({q, ct, sp, sort}) {
+      // 1. Search by name
+      let result = allDoctors.slice();
+      if(q) {
+        const qq = q.trim().toLowerCase();
+        result = result.filter(doc => doc.name.toLowerCase().includes(qq));
+      }
+      // 2. Consultation type
+      if(ct === 'video_consult')
+        result = result.filter(doc => doc.video_consult);
+      else if(ct === 'in_clinic')
+        result = result.filter(doc => doc.in_clinic);
+
+      // 3. Specialties filter (any selected matches)
+      if(sp && sp.length > 0) {
+        result = result.filter(doc => doc.specialities.some(sobj => sp.includes(sobj.name)));
+      }
+
+      // 4. Sorting
+      if(sort === 'fees') {
+        // Fees ascending
+        result.sort((a, b) =>
+          parseInt(a.fees.replace(/[₹, ]/g,'')) - parseInt(b.fees.replace(/[₹, ]/g,''))
+        );
+      } else if(sort === 'experience') {
+        // Experience descending
+        result.sort((a, b) =>
+          parseInt(b.experience) - parseInt(a.experience)
+        );
+      }
+
+      filteredDoctors = result;
+      renderDoctorList();
+    }
+
+    // Renders doctor cards
+    function renderDoctorList() {
+      let cont = document.getElementById('doctor-list');
+      cont.innerHTML = '';
+      if(filteredDoctors.length === 0) {
+        document.getElementById('no-results').classList.remove('hidden');
+        return;
+      } else {
+        document.getElementById('no-results').classList.add('hidden');
+      }
+      filteredDoctors.forEach(doc => {
+        // Experience and Fee clean
+        const exp = doc.experience.replace(/[^\d]/g,'');
+        const fee = doc.fees;
+        const name = doc.name;
+        const photo = doc.photo && doc.photo.startsWith("http") ? doc.photo :
+          "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.2/svgs/solid/user-md.svg";
+        // Specialties as string
+        const specs = doc.specialities.map(s=>s.name).join(', ');
+        // Animations on hover
+        cont.innerHTML += `
+        <div data-testid="doctor-card" class="bg-white rounded-xl shadow-md overflow-visible transform transition-all hover:scale-105 hover:shadow-lg focus-within:scale-105 focus-within:shadow-2xl border border-blue-50 fade-in">
+          <div class="p-5 flex flex-col">
+            <div class="flex items-center mb-3">
+              <img src="${photo}" alt="${name}" class="rounded-full w-16 h-16 sm:w-20 sm:h-20 object-cover ring-2 ring-blue-100 bg-gray-100 border border-gray-200 mr-4 transition-all duration-200 hover:scale-110" />
+              <div>
+                <span data-testid="doctor-name" class="block text-xl font-semibold text-blue-800">${name}</span>
+                <span data-testid="doctor-specialty" class="block text-sm text-gray-700">${specs}</span>
+              </div>
+            </div>
+            <div class="flex flex-col text-gray-600 text-sm">
+              <span data-testid="doctor-experience"><i class="fas fa-calendar-alt text-blue-400 mr-1"></i> Experience: <span class="font-medium">${exp} years</span></span>
+              <span data-testid="doctor-fee"><i class="fas fa-rupee-sign text-green-400 mr-1"></i> Fee: <span class="font-medium">${fee}</span></span>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-4">
+              ${doc.video_consult ? `<span class="bg-blue-50 text-blue-600 rounded px-2 py-1 text-xs font-semibold"><i class="fas fa-video mr-1"></i>Video Consult</span>` : ''}
+              ${doc.in_clinic ? `<span class="bg-green-50 text-green-600 rounded px-2 py-1 text-xs font-semibold"><i class="fas fa-hospital-user mr-1"></i>In Clinic</span>` : ''}
+              <span class="bg-gray-50 text-gray-500 px-2 py-1 rounded text-xs">${doc.clinic && doc.clinic.address ? doc.clinic.address.city : 'Location unknown'}</span>
+            </div>
+          </div>
+        </div>`;
+      });
+    }
+
+    // Autocomplete Handler
+    function handleAutocomplete(query) {
+      query = (query||"").trim().toLowerCase();
+      if(!doctorNames.length || !query) {
+        document.getElementById('search-suggestions').classList.add('hidden');
+        return;
+      }
+      let suggestions = doctorNames.filter(n => n.toLowerCase().includes(query)).slice(0,3);
+      renderAutocompleteSuggestions(suggestions, query);
+    }
+    function renderAutocompleteSuggestions(suggestions, origQuery) {
+      const list = document.getElementById('search-suggestions');
+      if(!suggestions || suggestions.length === 0 || !origQuery) {
+        list.classList.add('hidden');
+        list.innerHTML = '';
+        return;
+      }
+      list.innerHTML = suggestions.map((s,idx) => 
+        `<li data-testid="suggestion-item" class="cursor-pointer px-4 py-2 hover:bg-blue-50 transition" onclick="selectAutocomplete('${s.replace(/'/g,"\\'")}')">${s}</li>`
+      ).join('');
+      list.classList.remove('hidden');
+    }
+    // Autocomplete selection event
+    function selectAutocomplete(val) {
+      document.getElementById('autocomplete-input').value = val;
+      document.getElementById('search-suggestions').classList.add('hidden');
+      applyFilters();
+    }
+
+    // Hide dropdown on unfocus (and click outside)
+    document.addEventListener('click', function(e){
+      const sug = document.getElementById('search-suggestions');
+      const inp = document.getElementById('autocomplete-input');
+      if(!sug.contains(e.target) && e.target !== inp) {sug.classList.add('hidden');}
+    });
+    // Enter key = select first suggestion
+    document.getElementById('autocomplete-input').addEventListener('keydown', function(e){
+      if(e.key==='Enter') {
+        const box = document.getElementById('search-suggestions');
+        if (box.childNodes.length > 0 && !box.classList.contains('hidden')) {
+          box.childNodes[0].click();
+        } else {
+          applyFilters();
+        }
+      }
+    });
+
+    // Handle browser navigation to restore state
+    window.addEventListener('popstate', () => {
+      const state = loadStateFromQuery();
+      syncFilterPanelWithState(state);
+      applyFilters(false);
+    });
+
+    // On filter panel render, hook up checkboxes etc.
+    window.applyFilters = applyFilters;
+    window.selectAutocomplete = selectAutocomplete;
+
+    // Load doctor data
+    async function fetchDoctors() {
+      const url = "https://srijandubey.github.io/campus-api-mock/SRM-C1-25.json";
+      try {
+        const resp = await fetch(url);
+        let data = await resp.json();
+        // Clean fees and experience here
+        data.forEach(doc=>{
+          doc.fees = doc.fees && typeof doc.fees==='string' ? doc.fees : "₹ 0";
+          let exp = (doc.experience||"").match(/(\d+)/);
+          doc.experience = exp ? exp[1] : "0";
+        });
+        allDoctors = data;
+        doctorNames = Array.from(new Set(allDoctors.map(d=>d.name))).sort();
+        apiLoaded = true;
+        // Restore state from URL/query, else show all
+        const state = loadStateFromQuery();
+        syncFilterPanelWithState(state);
+        filterAndRenderDoctors(state);
+      } catch (e) {
+        document.getElementById('doctor-list').innerHTML = `
+          <div class="col-span-full flex flex-col items-center text-xl text-red-500 py-14">
+            <i class="fas fa-triangle-exclamation text-4xl mb-2 animate-pulse"></i>
+            Failed to load doctor data. Please refresh.
+          </div>`;
+      }
+    }
+
+    // On load
+    fetchDoctors();
+
+    // Responsive adjustment to avoid scrollbars in filter for print/PDF
+    window.onresize = function() {
+      let f = document.getElementById('specialties-filter');
+      if(window.innerWidth >= 768) f.classList.remove('max-h-96');
+    }
+  </script>
+</body>
+</html>
